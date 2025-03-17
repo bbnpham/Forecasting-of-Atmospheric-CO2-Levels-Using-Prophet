@@ -1,0 +1,429 @@
+---
+title: "<h2>Forecasting of Atmospheric CO2 Levels Using Prophet</h2>"
+author: "Beverly Pham"
+date: "12/03/2025"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    theme: spacelab 
+    highlight: tango
+---
+ 
+```{r, echo=FALSE}
+# This code will display the QMUL logo at the top right of the page
+# Do not change this code
+htmltools::img(src = knitr::image_uri("images/QMlogo.png"),
+               alt = 'logo',
+               style = 'position:absolute; top:0; right:0; padding:10px; width:20%;')
+```
+
+# 1. Introduction
+
+This project focuses on utilising Meta's Prophet package to forecast atmospheric CO2 levels. Prophet is suited to handle time series data with distinct seasonal patterns and long term trends, ideal for the `co2` dataset which will serve as the basis for this analysis.
+
+The key objectives of this project are to:
+
+- Load and prepare the `co2` dataset for analysis
+
+- Apply Prophet to forecast future atmospheric CO2 levels
+
+- Visualise and interpret the forecasted trends and seasonal patterns
+
+- Comment on results, including trends and limitations
+
+## 1.1 Understanding `prophet`
+
+Prophet is a forecasting tool by Meta that helps predict future trends in time series data, especially when there are patterns like seasonality and trends over time.
+
+**How prophet models trends and seasonalities**
+
+1. Trend
+
+- Prophet models trends as linear (default), logistic (with a cap), or flat (no growth)
+- It detects where trends shift automatically but can be set manually
+
+2. Seasonality
+
+- Prophet can automatically detect yearly, weekly and daily patterns
+- Seasonality can be additive (default) or multiplicative, depending on how it affects the trend
+
+**Why is Prophet appropriate for `co2` dataset?**
+
+- The linear trend option is suitable for CO2 data, as it shows a steady increase
+- Yearly seasonality is important due to natural cycles (like plant growth)
+
+## 1.2 Understanding the `co2` dataset
+
+The `co2` dataset within R contains monthly atmospheric CO2 concentrations measured at the Mauna Loa Observatory in Hawaii, from 1959 to 1997.
+
+- Dataset contains 468 monthly observations
+- CO2 concentration is measured in parts per million (ppm)
+
+Atmospheric CO2 is a greenhouse gas contributing to global warming. Monitoring its levels over time helps understand climate change trends and seasonal environmental behaviours.
+
+This data is ideal for time series analysis as it covers a long time period and long term trends and seasonal patterns can be studied.
+
+## 1.3 Loading Libraries
+
+The following R packages were used for this analysis:
+
+- `prophet` for time series forecasting
+- `zoo` for working with time series data  
+- `tidyverse` for data manipulation and cleaning
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+library(prophet)
+library(tidyverse)
+library(zoo)
+```
+
+# 2. Preparing the Data
+
+Prophet requires that the data be in a `dataframe` format with two specific columns, ds (date) and y (values to forecast) . 
+
+```{r, echo=TRUE, message=FALSE, warning=FALSE, comment=""}
+head(co2)
+```
+
+At the moment our `co2` dataset is a time series (`ts`) object, so it must first be converted into a dataframe. 
+
+## 2.1 Creating a dataframe
+
+To convert the data into a data frame:
+
+- `ds` should contain the date values
+- `y` should contain the numeric values to forecast (in this case the CO2 measurements)
+
+And can be done with the code below:
+
+```{r, comment = ""}
+co2_dataframe = data.frame(    # Convert time index to year/month format                    
+  ds=zoo::as.yearmon(time(co2)),   # Keep the CO2 measurements as numeric values
+  y=co2) 
+
+head(co2_dataframe)    #verify that dataframe structure is correct
+```
+
+Our dataset is now in the correct format for us to use Prophet, where:
+
+- `ds` is dates
+- `y` are CO2 values
+
+# 3. Fitting the Prophet Model
+
+The Prophet model is fitted to the prepared dataset `co2_dataset` using the default parameters
+
+The following code fits the model:
+
+```{r, echo=TRUE, message=FALSE, warning=FALSE}
+prophet_model <- prophet(co2_dataframe)
+```
+
+Prophet is able to automatically detect trends and seasonality patterns:
+
+- Trend competent, capturing long term growth or decline in CO2 levels
+- Seasonal competent, capturing yearly repeating patterns (e.g. peaks and troughs in CO2 levels)
+
+## 3.1 Creating Future Dataframes
+
+We can use Prophet to learn from historical data and detect underlying patterns and prepare for forecasting future trends.
+
+The function `make_future_dataframe()` is used to extend the timeline for which CO2 levels are forecasted.
+
+- `periods = 12` extends the forecast by 12 future periods 
+- `freq =
+"month"` sets the frequency of data to monthly
+
+Setting these conditions is important as Prophet needs to know how far into the future to forecast and also ensures the dates are consistent with the original data's time frame.
+
+```{r, comment = ""}
+#create a future dataframe for forecasting the next 12 months
+forecast_co2 <- make_future_dataframe(prophet_model, periods = 12, freq = "month")
+```
+
+## 3.2 Generating the Forecast
+
+The following code uses the `predict()` function to generate forecasts for the future dates.
+
+```{r, comment=""}
+#predict future CO2 levels
+predict_co2 = predict(prophet_model, forecast_co2)
+
+#preview the future dataframe
+head(predict_co2)
+```
+
+The important collumns for our analysis are: 
+
+- ds: the forecasted dates
+- yhat: the predicted CO2 values
+- yhat_lower and yhat_upper: confidence intervals
+
+# 4. Plotting the forecasted results
+
+The forecast plot shows the historical data and the predicted future trend and is plotted below.
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+plot(prophet_model, predict_co2,
+     xlabel = ("Date"), 
+     ylabel = ("CO2 levels ppm")
+)
+```
+
+Here is also an interactive plot of CO2 levels. Hover over the graph to explore exact CO2 levels at certain dates.
+
+This is made by installing the package `plotly`
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+library(plotly)
+p <- plot_ly(data = co2_dataframe, x = ~ds,y = ~y, type ='scatter', mode ='lines')
+p
+```
+
+## 4.1 Interpreting the Forecast plot
+
+**Overall trend**
+
+- The plot shows a clear and consistent upward trend in atmospheric CO2 levels from 1959 to 1997, with the forecast extending this trend into the long term future
+- The gradual increase suggests that CO2 concentrations have been steadily rising over the observed period and are expected to continue increasing.
+
+**Seasonal Patterns**
+
+- The regular oscillations or fluctuations in the plotted line represent seasonal variations in CO2 levels, where CO2 concentrations rise and fall  within each year creating a cyclic pattern
+- These patterns emerge from natuaral processes such as plant growth or decay cycles which depend upon seasons.
+- The seasonality pattern remains consistent in the forecasted period, indicating the model has effectively learned and replicated the seasonal behaviour from historical data.
+
+## 4.2 Comparing Time periods
+
+The two graphs below are a comparison of atmospheric CO2 concentration levels over the first and last 5 periods, 1959-1964 and 1993-1997, of the historic data. Each graph displays individual monthly CO2 measurements alongside a fitted linear regression line to highlight the overall trend in each period.
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+co2_dataframe$ds <- as.Date(co2_dataframe$ds)
+
+first_5_years <- subset(co2_dataframe,ds >= as.Date("1959-01-01") & ds <= as.Date("1964-12-01"))
+if(nrow(first_5_years) > 0) {
+
+    plot(first_5_years$ds, first_5_years$y,type = "p", col = "blue",
+       xlab ="Year", ylab = "CO2 concentration ppm",
+       main = "CO2 Levels First 5 Years: 1959-1964")
+  first_model <- lm(y ~ as.numeric(ds), data = first_5_years)
+  abline(first_model, col= "red",lwd =2)
+} else {
+  print("No data found")
+}
+
+last_5_years <- subset(co2_dataframe,ds >= as.Date("1993-01-01") & ds <= as.Date("1997-12-01"))
+if(nrow(last_5_years) > 0) {
+  plot(last_5_years$ds, last_5_years$y,type ="p", col = "green",
+       xlab = "Year", ylab ="CO2 concentration ppm",
+       main ="CO2 Levels Last 5 Years: 1993-1997")
+  last_model <- lm(y~ as.numeric(ds), data = last_5_years)
+  abline(last_model,col= "red", lwd = 2)
+} else {
+  print("No data found.")
+}
+
+first_gradient <- coef(first_model)[2]
+cat("Gradient first 5 years (1959-1964):", first_gradient, "\n")
+last_gradient <- coef(last_model)[2]
+cat("Gradient last 5 years (1993-1997):", last_gradient, "\n")
+```
+
+**First 5 Years (1959-1964)**
+
+- The CO2 concentration ranged approximately between 313 ppm to 322 ppm
+- The slope of the regression line for this period is 0.00166, suggsting that CO2 levels increased by 0.00166 ppm per month in this earlier period
+- The increase is relatively modest indicating a slower growth rate in atmospheric CO2 levels.
+
+**Last 5 Years (1993-1997)**
+
+- CO2 concentrations ranged from around 354 ppm to 366 ppm, indicating a significantly higher baseline level compared to the earlier period
+- The gradient for this period indicate that CO2 levels were increasing by 0.00422 ppm per month
+This shows a considerably faster rate of increase compared to the first 5 years, suggesting an acceleration in CO2 concentration growth over time 
+
+The comparison clearly demonstrates that the rate of CO2 concentration growth has significantly increased over the decades. This aligns with broader concerns regarding the impact of industrialisation and human activities on CO2 emmisions that contribute to climate change.
+
+
+# 5. Linear Regression for Trend Analysis
+
+Linear regression can be carried out to understand the overall growth rate of CO2 levels over time. 
+The plot displays the historical CO2 concentration data (black dots) alongside a fitted linear regression line (in red).
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+
+co2_dataframe$time_numeric<- as.numeric(co2_dataframe$ds)
+
+linear_model<- lm(y~ time_numeric, data = co2_dataframe)
+
+plot(co2_dataframe$ds, co2_dataframe$y,
+     main = "Linear trend of CO2 levels",
+     xlab = "Date", 
+     ylab = "CO2 Concentration ppm",
+     pch= 16)
+abline(linear_model, col = "red", lwd = 2)
+```
+
+## 5.1 Key Observations from linear regression
+
+- The red regression line shows a clear upward trend, indicating that CO2 levels have been steadily increasing over the observed period
+
+- The scatter of points around the line suggests the presence of seasonal fluctuations that the linear model does not fully capture. But the trend line effectively summarises the overall increase in CO2 concentrations
+
+```{r, comment = ""}
+#display linear regression summary
+summary(linear_model)
+```
+
+**Statistical significance**
+
+- p-values for both coeffiecients are both <2e-16 meaning they are highly statistically significant ( further confirmed by the *** next to them )
+
+**Goodness of fit**
+
+- r-squared = 0.9695, means that 96.95% of the variability in CO2 levels is explained by the linear model, indicating an excellent fit
+
+- adjusted r-squared = 0.9694, this value adjusts for the number of predictors in the model and is nearly identical to the regular r-squared, confirming the model's validity
+
+- residual Standard Error = 2.618, this indicates the average deviation of the actual CO2 levels from the fitted values. Lower values indicate a better fit, the realatively high values here is most likely due to seasonal trends
+
+**F-statistic and P-value**
+
+- f-statistic = 1.479e+04, p-value < 2.2e-16
+- Both are <0.05, this confirms that the model is statistically significant overall and the trend is not due to random variation
+
+**Coefficients**
+
+- On average, CO2 concentrations have been increasing by approximately 1.308 ppm per year 
+- note: the intercept is not meaningful in this model as dates don't 'start at 0'
+
+**Limitations of linear model**
+
+- seasonality fluncations are not captured
+- real world data may experience variable growth rates with the linear model cannot capture
+- prophet is a better choice for capturing both trend and seasonality, but the linear regression helps to quantify the overall growth rate
+
+# 6. Average seasonal pattern
+
+This graph helps to highlight which months typically have higher or lower CO2 levels. If a clear pattern emerges, it suggests a strong seasonal effect.
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+
+co2_dataframe$year<- format(co2_dataframe$ds, "%Y")
+co2_dataframe$month<- as.numeric(format(co2_dataframe$ds, "%m"))
+
+historical_avg<- aggregate(y ~month +year, data =co2_dataframe,FUN = mean)
+
+matplot(unique(historical_avg$month),
+        tapply(historical_avg$y,list(historical_avg$month, historical_avg$year),mean),
+        type ="l", lty = 1,col = rainbow(length(unique(historical_avg$year))),
+        xlab ="month", ylab = "CO2 concentration ppm",
+        main = "Year over year CO2 levels by month")
+
+legend("topleft",
+       legend = paste0("Year - ",unique(historical_avg$year)),
+       col =rainbow(length(unique(historical_avg$year))),
+       lty =1,cex = 0.5)
+```
+
+**Interpretation of year over year CO2 levels by month graph**
+
+- The graph clearly shows consistent seasonal patterns across all years
+- Each yearly line is progressively higher than the previous one, indicating a steady increase in CO₂ concentration over the yearsand reinforces the long term growth trend
+- Despite the overall increase, the difference between the highest and lowest monthly values within a year remains relatively consistent
+
+We can also explore the rate of change in CO2 levels month over month.
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+co2_dataframe$diff_y <- c(NA, diff(co2_dataframe$y))
+
+plot(co2_dataframe$ds, co2_dataframe$diff_y, type = "l",
+     col ="blue", lwd = 2, xlab = "Year",
+     ylab = "Monthly change in CO2 pp,",
+     main ="Monthly rate of change in CO2 Levels")
+abline(h = 0, col = "red", lty = 2)
+```
+
+**Interpretation of the monthly rate of change in CO2 levels graph**
+
+- The graph displays a strong cyclical pattern, with regular peaks and troughs each year
+- The monthly rate of change fluctuates between approximately -2/+2 ppm
+- The overall magnitude and frequency of these fluctuations remain consistent throughout
+- This suggests that while absolute CO2 levels are increasing, the rate of monthly change remains stable, reflecting predictable seasonal cycles
+
+Prophet successfully captured the overall trend of rising CO2 levels, along with the consistent seasonal cycles seen throughout the dataset.
+The model's forecasted values extended the historical trend into the future while maintaining the identified seasonal characteristics.
+
+# 7 Numbers of Interest
+
+## 7.1 Summary statistics for historic data
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE, comment = ""}
+summary(co2_dataframe$y)    #quartiles and range
+range(co2_dataframe$ds)
+
+mean(co2_dataframe$y)   #mean and stdev
+sd(co2_dataframe$y)
+
+sum(is.na(co2_dataframe$y))  #counting zero values
+
+```
+
+The summary statistics for CO2 levels from historical data show:
+
+- Range: CO2 levels increased from 313.2 ppm to 366.8 ppm, confirming a long term upward trend
+- Mean and Median: The mean is 337.1 ppm and the median is 335.2 ppm, indicating a fairly symmetric distribution
+- Variability: A standard deviation of 14.97 ppm suggests moderate fluctuation, likely due to seasonal changes
+- Quartiles: 50% of the data falls between 323.5 ppm and 350.3 ppm, showing consistent growth
+- Completeness: No missing values, confirming reliable data
+
+These statistics confirm a consistent upward trend in CO2 levels, with regular seasonal variations, as assumed with Prophet
+
+## 7.2 Summary statistics for future data
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE, comment = ""}
+summary(predict_co2$yhat)
+range(predict_co2$ds)
+mean(predict_co2$yhat)
+sd(predict_co2$yhat)
+```
+
+**Increased CO2 levels**
+
+- The predicted mean CO2 level (337.75 ppm) is slightly higher than the historical mean (337.1 ppm), indicating a gradual increase in average CO2 concentrations over time
+- The predicted maximum CO2 concentration (367.8 ppm) is slightly higher than the historical maximum (366.8 ppm), reinforcing the observation of a continuing upward trend in CO2 levels
+- The future data suggests that atmospheric CO2 levels will continue to rise, aligning with historical trends. This is indicative of ongoing emissions from human activities
+
+**Seasonal Patterns**
+
+- The first and third quartiles for the future data (323.7 ppm and 351.5 ppm) are similar to the historical data (323.5 ppm and 350.3 ppm), indicating consistency in the seasonal distribution of CO2 levels
+- This reflects natural processes continuing to influence CO2 cycles
+
+**Greater Variability**
+
+- The future standard deviation (15.41 ppm) is slightly higher than the historical value (14.97 ppm), suggesting that variability in CO2 levels may increase slightly in the future
+- This could be due to fluctuating emission rates or natuaral environmental changes
+ 
+# 8. Conclusion
+
+The analysis using Prophet showed that atmospheric CO2 levels have consistently increased from 1959 to 1997, with clear seasonal patterns and a strong upward long term trend. Prophet's forecast suggests that if current patterns continue, CO2 levels will keep rising steadily in the coming years.
+
+*Long Term Trend:*
+
+The model identified a continuous rise in CO2 concentrations, indicating that emissions have been increasing over time. If this trend persists, it could contribute to worsening climate effects such as global warming, rising sea levels and extreme weather conditions.
+
+*Seasonality:* 
+The analysis also confirmed strong yearly seasonal patterns, where CO2 levels tend to rise and fall within each year. This reflects natural processes like photosynthesis, which absorbs more CO2 during certain months. However while these natural cycles remain consistent, they don't contribute to the long term rise in CO2 levels.
+
+## 8.1 Real world analysis
+
+The Prophet model effectively captured both the long term trend and seasonal variations in CO2 levels. It suggests that without significant intervention, CO2 concentrations will continue to rise contributing to climate related challenges.
+
+This analysis highlights the importance of long term strategies to reduce emissions. Although natural cycles help balance CO2 in the short term, they aren't enough to counteract the steady upward trend. Reducing emissions through policy, technology and behavioural changes is critical to avoiding severe environmental impacts.
+
+Overall, Prophet's forecast emphasises the need for ongoing monitoring and action  on human and environmental decisions as well.
+
+
+![](images/lorax.png){width=40%}
+
+*This quote from the Lorax serves as a reminder that addressing environmental challenges like CO2 emissions requires collective care and action.*
